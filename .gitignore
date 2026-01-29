@@ -1,1 +1,6 @@
-src/__pycache__/load_ct.cpython-312.pyc
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc

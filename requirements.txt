@@ -1,0 +1,7 @@
+Python libraries needed : 
+numpy
+matplotlib
+pydicom
+opencv-python
+scipy
+torch
