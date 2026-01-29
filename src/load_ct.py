@@ -1,21 +1,26 @@
 import os
 import pydicom
 import numpy as np
+import glob
 
-def load_dicom(path: str) -> np.ndarray:
-    """Load a single DICOM file and return the pixel array."""
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"DICOM not found: {path}")
+def load_dicom_series(folder: str):
+    """Load all DICOM files in a folder and return a list of (filename, image_array)."""
+    files = sorted(glob.glob(os.path.join(folder, "*.dcm")))
+    if len(files) == 0:
+        raise FileNotFoundError(f"No .dcm files found in: {folder}")
 
-    ds = pydicom.dcmread(path)
-    img = ds.pixel_array.astype(np.float32)
+    series = []
+    for fp in files:
+        ds = pydicom.dcmread(fp)
+        img = ds.pixel_array.astype(np.float32)
+        series.append((fp, img))
 
-    return img
+    return series
 
 if __name__ == "__main__":
-    test_path = "data/raw/patient_10/IM-0001-0002.dcm"
-    img = load_dicom(test_path)
+    folder = "data/raw/patient_10"
+    series = load_dicom_series(folder)
 
-    print("Loaded DICOM slice:", test_path)
-    print("Shape:", img.shape)
-    print("Min/Max:", img.min(), img.max())
+    print("Number of slices:", len(series))
+    print("First slice:", series[0][0], "shape:", series[0][1].shape)
+    print("Last slice:", series[-1][0], "shape:", series[-1][1].shape)
