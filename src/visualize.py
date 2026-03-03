@@ -1,59 +1,75 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
+
+import numpy as np
 import matplotlib.pyplot as plt
 from load_ct import load_dicom_series
-from utils import apply_window, calcium_mask, heart_roi_mask
+from utils import apply_window
+from score_patient import process_slice
 
-
-# Viewer class to scroll through CT slices interactively
+# To manually scroll through the slices, red shows calcium
 class SliceViewer:
     def __init__(self, series):
         self.series = series
         self.idx = 0
 
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
-
-        # Black background
         self.fig.patch.set_facecolor("black")
         self.ax.set_facecolor("black")
-
-        # Remove all margins
         plt.subplots_adjust(left=0, right=1, top=0.95, bottom=0)
 
-        # Make window full screen (works on most systems)
+        # open the window in full screen
+        # Windows vs Mac, so we try both and silently ignore any error.
         mng = plt.get_current_fig_manager()
         try:
-            mng.window.state('zoomed')  # Windows
-        except:
+            mng.window.state("zoomed")
+        except Exception:
             try:
-                mng.window.showMaximized()  # Mac/Linux
-            except:
+                mng.window.showMaximized()
+            except Exception:
                 pass
 
-        # Draw first slice + overlay
-        self.base = self.ax.imshow(
-            apply_window(self.series[self.idx][1], level=50, width=350),
-            cmap="gray", aspect="auto"
-        )
+        img, overlay_data, score = self._compute(self.idx)
 
-        hu = self.series[self.idx][1]
-        roi = heart_roi_mask(hu.shape)
-        mask = calcium_mask(hu, threshold=130.0) & roi
-
-        # Create overlay once
-        self.overlay = self.ax.imshow(mask, cmap="Reds", alpha=0.25, aspect="auto")
-
-        self.ax.set_title(self._title(), color="white", pad=12, fontsize=14)
+        self.base= self.ax.imshow(img, cmap="gray")
+        self.overlay = self.ax.imshow(overlay_data, cmap="Reds",
+                                      alpha=0.85, vmin=0, vmax=1)
+        self.ax.set_title(self._title(score), color="white", pad=12, fontsize=14)
+        self.ax.axis("off")
 
         self.fig.canvas.mpl_connect("key_press_event", self.on_key)
-        self.ax.axis("off")
         plt.show()
 
-    # Generate a readable title using the DICOM filename
-    def _title(self):
-        filename = self.series[self.idx][0].split("/")[-1]
-        slice_number = int(filename.split("-")[-1].split(".")[0]) # to match with filenames 
-        return f"Slice {slice_number} | {filename}"
-    
-    # left & right arrow keys to scroll slices
+    # Helpers
+    # Conver bool mask to float aray where true is 1 and false is Nan
+    def _mask_to_overlay(self, mask):
+        overlay = np.where(mask, 1.0, np.nan)
+        return overlay
+
+    # Run full CAC pipeline on slice idx and return display data
+    def _compute(self, idx):
+        path, hu, spacing = self.series[idx]
+        img = apply_window(hu, level=50, width=350)
+        mask, score = process_slice(hu, spacing)
+
+        # non heart level slices return (None, None) and show empty overlay
+        if mask is None:
+            mask  = np.zeros(hu.shape, dtype=bool)
+            score = 0.0
+
+        return img, self._mask_to_overlay(mask), score
+
+    def _title(self, score):
+        filename = os.path.basename(self.series[self.idx][0])
+        try:
+            slice_num = int(filename.split("-")[-1].split(".")[0])
+            label     = f"Slice {slice_num} | {filename}"
+        except ValueError:
+            label = filename
+        return f"{label} | Slice Agatston: {score:.2f}"
+
+    # Event handler
     def on_key(self, event):
         if event.key == "right":
             self.idx = min(self.idx + 1, len(self.series) - 1)
@@ -62,23 +78,18 @@ class SliceViewer:
         else:
             return
 
-        hu = self.series[self.idx][1]
-        img = apply_window(hu, level=50, width=350)
-        roi = heart_roi_mask(hu.shape)
-        mask = calcium_mask(hu, threshold=130.0) & roi
-
-        # Update both layers
+        img, overlay_data, score = self._compute(self.idx)
         self.base.set_data(img)
-        self.overlay.set_data(mask)
-
-        self.ax.set_title(self._title(), color="white")
+        self.overlay.set_data(overlay_data)
+        self.ax.set_title(self._title(score), color="white", pad=12, fontsize=14)
         self.fig.canvas.draw_idle()
 
 
 if __name__ == "__main__":
-    folder = "data/raw/100"
-    series = load_dicom_series(folder)
+    folder = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "100")
+    folder = os.path.normpath(folder)
 
+    series = load_dicom_series(folder)
     print(f"Loaded {len(series)} slices.")
     print("Use ← and → arrow keys to scroll.")
     SliceViewer(series)
