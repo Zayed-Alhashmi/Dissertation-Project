@@ -3,6 +3,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from load_ct import load_dicom_series
+from cli import pick_folder
 from utils import (
     calcium_mask,
     lung_guided_roi_mask,
@@ -43,7 +44,7 @@ def process_slice(hu, spacing):
 
 
 # Sum Agatston scores across slices in the middle 70 % of the series
-def total_agatston(series):
+def total_agatston(series, verbose: bool = True):
     total   = 0.0
     skipped = 0
     n       = len(series)
@@ -59,17 +60,17 @@ def total_agatston(series):
             continue
 
         total += score
-        if score > 50:  # only log slices with notable calcium
+        if verbose and score > 0:  # log every slice with any detection (just for debug)
             print(f"  {os.path.basename(path)} -> slice score: {score:.1f}"
                   f"  (pixels: {int(mask.sum())})")
 
-    print(f"  [auto-skipped {skipped} slice(s) below heart level threshold]")
+    if verbose:
+        print(f"  [auto-skipped {skipped} slice(s) below heart level threshold]")
     return total
 
 
 if __name__ == "__main__":
-    folder = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "100")
-    folder = os.path.normpath(folder)
+    folder = pick_folder("Select the patient DICOM folder")
 
     print("Running score_patient.py")
     print(f"Folder: {folder}")

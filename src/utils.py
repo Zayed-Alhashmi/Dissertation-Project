@@ -17,7 +17,7 @@ def heart_roi_mask(shape, cx=0.50, cy=0.52, rx=0.20, ry=0.17,sternum_y=0.25, spi
 
     ellipse = ((x - cx_px) / rx_px) ** 2 + ((y - cy_px) / ry_px) ** 2 <= 1.0  # standard ellipse equation
     sternum = (y < h * sternum_y) & (np.abs(x - cx_px) < w * cut_w) # top centre strip (sternum)
-    spine   = (y > h * spine_y)   & (np.abs(x - cx_px) < w * cut_w) # bottom centre strip (spine)
+    spine   = (y > h * spine_y)   & (np.abs(x - cx_px) < w * 0.24)  # bottom centre strip (spine — wider)
 
     return ellipse & ~sternum & ~spine   # ellipse minus bone exclusions
 
@@ -112,8 +112,9 @@ def lung_guided_roi_mask(hu: np.ndarray,
 # Return True if the slice contains two interior lungs one on each side of the midline.
 def is_heart_level_slice(hu: np.ndarray,
                          lung_hu_thr: float = -400.0,
-                         min_lung_area_px: int = 18000) -> bool:
+                         min_lung_frac: float = 0.07) -> bool:
     h, w = hu.shape
+    min_lung_area_px = int(h * w * min_lung_frac)  # scale with image resolution
     air_mask   = hu < lung_hu_thr  # isolate air regions
     labeled, n = ndi.label(air_mask)  # label connected components
     if n == 0:

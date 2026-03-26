@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import numpy as np
 import matplotlib.pyplot as plt
 from load_ct import load_dicom_series
+from cli import pick_folder
 from utils import apply_window
 from score_patient import process_slice
 
@@ -86,8 +87,7 @@ class SliceViewer:
 
 
 if __name__ == "__main__":
-    folder = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "100")
-    folder = os.path.normpath(folder)
+    folder = pick_folder("Select the patient DICOM folder")
 
     series = load_dicom_series(folder)
     print(f"Loaded {len(series)} slices.")
