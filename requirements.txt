@@ -1,7 +1,12 @@
-Python libraries needed : 
-numpy
-matplotlib
 pydicom
-opencv-python
+numpy
 scipy
+matplotlib
 torch
+torchvision
+scikit-learn
+scikit-image
+streamlit
+pandas
+Pillow
+tkinterdnd2

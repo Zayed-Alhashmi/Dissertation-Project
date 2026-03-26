@@ -1,101 +1,120 @@
-# Dissertation-Project
-This Github will carry my Dissertation progress throughout my 3rd year in University of Leeds.
+# Automated CAC Scoring from Chest CT using Classical Pipeline + CNN
 
+This project implements an automated Coronary Artery Calcium (CAC) scoring system applied to real chest CT scans from the Stanford AIMI public dataset. It computes Agatston scores using a classical image processing pipeline and lays the groundwork for a hybrid approach that combines the classical method with a CNN-based classifier to reduce false positives. The system is validated against ground truth scores across 29 patients, with metrics including MAE, RMSE, and Pearson correlation.
 
-Week 1 — Project Setup & Basic Image Handling
-    •    Set up Python environment and project structure
-    •    Install required libraries
-    •    Load and display basic medical images (PNG/JPG)
-    •    Verify code execution and visualization pipeline
+---
 
-Status: Completed
+## Installation
 
-⸻
+```bash
+pip install -r requirements.txt
+```
 
-Week 2 — DICOM & CT Fundamentals
-    •    Load real chest CT DICOM files
-    •    Explore CT slices sequentially
-    •    Understand slice ordering and anatomy variation
-    •    Visualize individual DICOM slices
+> Python 3.10+ recommended.
 
-Status: Planned
+---
 
-⸻
+## Usage
 
-Week 3 — Hounsfield Units & Preprocessing
-    •    Convert raw DICOM pixel values to Hounsfield Units (HU)
-    •    Apply basic windowing and clipping
-    •    Normalize CT slices
-    •    Visualize preprocessed vs raw images
+### Classical Pipeline
 
-Status: Planned
+Run the classical Agatston scoring pipeline on a single patient folder:
 
-⸻
+```bash
+python src/score_patient.py
+```
 
-Week 4 — Classical CAC Detection (Baseline)
-    •    Apply thresholding for calcium detection (>130 HU)
-    •    Generate binary calcium masks
-    •    Visualize detected calcium regions
-    •    Identify common false positives (bone, noise)
+A folder picker window will open. Select the folder containing the patient's `.dcm` files. The total Agatston score will be printed to the terminal.
 
-Status: Planned
+---
 
-⸻
+### Batch Validation (Classical)
 
-Week 5 — CAC Scoring & Risk Stratification
-    •    Implement connected component analysis
-    •    Calculate calcium area and scores
-    •    Implement simplified Agatston-style scoring
-    •    Assign CAC risk categories
+Compare the classical pipeline against ground truth scores across all patients:
 
-Status: Planned
+```bash
+python src/validate.py
+```
 
-⸻
+Select the data root folder (which contains one subfolder per patient) and the `scores.csv` ground truth file. Outputs MAE, RMSE, and Pearson r.
 
-Week 6 — AI Preparation
-    •    Decide AI approach (CNN / YOLO-style detection)
-    •    Prepare training samples from CT slices
-    •    Split data into training and validation sets
-    •    Verify model training pipeline runs correctly
+---
 
-Status: Planned
+### CNN Training
 
-⸻
+_Coming soon — train the patch CNN classifier on auto-labelled DICOM data._
 
-Week 7 — AI Model Training
-    •    Train initial AI model for calcium detection
-    •    Generate predictions on test slices
-    •    Compare AI output with baseline method
-    •    Identify strengths and weaknesses
+```bash
+# python src/train.py --data_dir /path/to/patient_folders
+```
 
-Status: Planned
+---
 
-⸻
+### Hybrid Pipeline
 
-Week 8 — Evaluation
-    •    Compute evaluation metrics (MAE, RMSE, correlation)
-    •    Compare baseline vs AI performance
-    •    Create result tables and plots
-    •    Interpret quantitative results
+_Coming soon — classical pipeline with CNN re-scoring to reduce false positives._
 
-Status: Planned
+```bash
+# python src/score_patient_hybrid.py
+```
 
-⸻
+---
 
-Week 9 — Explainability & Error Analysis
-    •    Visualize model attention / heatmaps
-    •    Analyse false positives and false negatives
-    •    Discuss limitations of the approach
-    •    Document findings clearly
+### Streamlit Demo App
 
-Status: Planned
+_Coming soon — interactive web UI for slice-by-slice visualisation and scoring._
 
-⸻
+```bash
+# streamlit run src/app.py
+```
 
-Week 10 — Finalisation
-    •    Clean and document code
-    •    Finalise experiments and figures
-    •    Write final evaluation and discussion
-    •    Prepare final submission
+---
 
-Status: Planned
+## Slice Visualiser
+
+Scroll through CT slices with a red overlay highlighting detected calcium:
+
+```bash
+python src/visualize.py
+```
+
+---
+
+## Project Structure
+
+```
+ProjectAnti/
+├── src/
+│   ├── load_ct.py          # DICOM loading and HU conversion
+│   ├── utils.py            # All image processing (ROI, filtering, detection)
+│   ├── scoring.py          # Agatston weight table and slice score
+│   ├── score_patient.py    # Full pipeline orchestration
+│   ├── validate.py         # Batch validation against ground truth
+│   ├── cli.py              # GUI folder picker (drag-and-drop + browse)
+│   └── visualize.py        # Matplotlib slice viewer with calcium overlay
+├── data/                   # Patient DICOM folders (not committed)
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Results
+
+| Metric | Classical Pipeline | Hybrid Pipeline (CNN) |
+|---|---|---|
+| MAE | TBD | TBD |
+| RMSE | TBD | TBD |
+| Pearson r | TBD | TBD |
+
+---
+
+## Dataset
+
+Stanford AIMI Chest CT dataset. Patient DICOM files and ground truth Agatston scores (`scores.csv`) are not included in this repository due to data governance constraints.
+
+---
+
+## Author
+
+Zayed Alhashmi — Individual Project, 2025/2026
