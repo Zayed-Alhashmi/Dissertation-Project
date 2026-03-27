@@ -1,12 +1,7 @@
-"""
-main.py — top-level entry point for ProjectAnti.
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-Usage:
-    python main.py --mode classical    # Score a single patient (GUI folder picker)
-    python main.py --mode validate     # Batch validate against ground truth CSV
-    python main.py --mode visualize    # Open the slice viewer
-"""
-
+# Usage: python main.py --mode [classical | validate | visualize]
 import argparse
 
 

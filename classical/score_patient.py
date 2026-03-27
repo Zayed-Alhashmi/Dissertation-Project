@@ -1,4 +1,5 @@
-import os
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from classical.load_ct import load_dicom_series
 from classical.cli import pick_folder

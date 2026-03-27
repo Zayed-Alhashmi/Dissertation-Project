@@ -1,4 +1,5 @@
-import os
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -84,10 +85,78 @@ class SliceViewer:
         self.fig.canvas.draw_idle()
 
 
-if __name__ == "__main__":
-    folder = pick_folder("Select the patient DICOM folder")
 
-    series = load_dicom_series(folder)
-    print(f"Loaded {len(series)} slices.")
-    print("Use ← and → arrow keys to scroll.")
-    SliceViewer(series)
+# Shows labelled 64x64 patches from a .npz file one at a time with a coloured border indicating the label.
+class PatchViewer:
+    def __init__(self, npz_path: str):
+        data = np.load(npz_path, allow_pickle=True)
+        self.patches     = data["patches"]      # (N, 64, 64) float32
+        self.labels      = data["labels"]       # (N,) int
+        self.patient_ids = data["patient_ids"]  # (N,)
+        self.peak_hus    = data["peak_hus"]     # (N,)
+        self.area_mm2s   = data["area_mm2s"]    # (N,)
+        self.n           = len(self.labels)
+        self.idx         = 0
+
+        self.fig, self.ax = plt.subplots(figsize=(6, 6))
+        self.fig.patch.set_facecolor("black")
+        self.ax.set_facecolor("black")
+
+        self.im = self.ax.imshow(self.patches[0], cmap="gray", vmin=0, vmax=1)
+        self.ax.axis("off")
+
+        self._draw()
+        self.fig.canvas.mpl_connect("key_press_event", self._on_key)
+        plt.tight_layout()
+        plt.show()
+
+    # Redraws the current patch, title, and border colour.
+    def _draw(self):
+        patch = self.patches[self.idx]
+        label = int(self.labels[self.idx])
+
+        self.im.set_data(patch)
+
+        label_str = "CAC" if label == 1 else "FALSE POSITIVE"
+        border_colour = "red" if label == 1 else "blue"
+        pid      = str(self.patient_ids[self.idx])
+        peak_hu  = float(self.peak_hus[self.idx])
+        area     = float(self.area_mm2s[self.idx])
+
+        title = (f"Patch {self.idx + 1}/{self.n}  |  Patient: {pid}  |  "
+                 f"Label: {label_str}  |  Peak HU: {peak_hu:.0f}  |  Area: {area:.2f} mm²")
+        self.ax.set_title(title, color="white", fontsize=9, pad=8)
+
+        for spine in self.ax.spines.values():  # coloured border signals the label at a glance
+            spine.set_edgecolor(border_colour)
+            spine.set_linewidth(5)
+            spine.set_visible(True)
+
+        self.fig.canvas.draw_idle()
+
+    def _on_key(self, event):
+        if event.key == "right":
+            self.idx = min(self.idx + 1, self.n - 1)
+        elif event.key == "left":
+            self.idx = max(self.idx - 1, 0)
+        else:
+            return
+        self._draw()
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--patches", metavar="NPZ", default=None,
+                        help="Path to a labelled patches .npz file — opens the patch viewer")
+    args, _ = parser.parse_known_args()
+
+    if args.patches:
+        print(f"Opening patch viewer: {args.patches}")
+        PatchViewer(args.patches)
+    else:
+        folder = pick_folder("Select the patient DICOM folder")
+        series = load_dicom_series(folder)
+        print(f"Loaded {len(series)} slices.")
+        print("Use \u2190 and \u2192 arrow keys to scroll.")
+        SliceViewer(series)
