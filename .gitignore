@@ -24,4 +24,5 @@ data/raw/
 data/processed/
 
 # Temp
-tempCodeRunnerFile.py
+tempCodeRunnerFile.pycnn/checkpoints/*.pt
+*.pt
