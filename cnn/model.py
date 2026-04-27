@@ -3,10 +3,8 @@ import torch.nn as nn
 from torchvision import models
 
 
-# WHY we freeze early layers:
-# The early ResNet layers (conv1, layer1-3) learn low-level features like edges
-# and textures that transfer well from ImageNet to CT patches.  Fine-tuning only
-# layer4 + FC reduces overfitting on our small dataset (~500-2000 patches).
+# Freezing early layers prevents overfitting on our small medical dataset while preserving basic edge-detection knowledge.
+# We only train the very last layer to specialize the network on coronary calcium.
 
 
 class ResNet18CACClassifier(nn.Module):
@@ -23,8 +21,7 @@ class ResNet18CACClassifier(nn.Module):
         new_conv = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
         if pretrained:
-            # Average pretrained RGB weights across channel dim (64,3,7,7) -> (64,1,7,7)
-            # Preserves learned spatial filters instead of random-init discarding them
+            # Compresses the standard 3-channel color network into a 1-channel greyscale medical network.
             with torch.no_grad():
                 new_conv.weight.copy_(old_conv.weight.mean(dim=1, keepdim=True))
 
@@ -48,13 +45,109 @@ class ResNet18CACClassifier(nn.Module):
                 param.requires_grad = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Standard ResNet forward pass; returns raw logits of shape (B, 1)
+        # Passes the medical image through the convolutional network to predict lesion probability.
         return self.model(x)
 
 
-# Instantiate and return a configured ResNet18CACClassifier
-def get_model(pretrained: bool = True, freeze_backbone: bool = True) -> ResNet18CACClassifier:
-    return ResNet18CACClassifier(pretrained=pretrained, freeze_backbone=freeze_backbone)
+# A highly optimized EfficientNet architecture designed to consume minimal memory while maintaining high accuracy.
+class EfficientNetB0CACClassifier(nn.Module):
+
+    def __init__(self, pretrained: bool = True, freeze_backbone: bool = True):
+        super().__init__()
+
+        weights = models.EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
+        backbone = models.efficientnet_b0(weights=weights)
+
+        # Replace first conv: (32, 3, 3, 3) -> (32, 1, 3, 3) accepting greyscale
+        old_conv = backbone.features[0][0]
+        new_conv = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
+
+        if pretrained:
+            # Compresses the standard 3-channel color network into a 1-channel greyscale medical network.
+            with torch.no_grad():
+                new_conv.weight.copy_(old_conv.weight.mean(dim=1, keepdim=True))
+
+        backbone.features[0][0] = new_conv
+
+        # Replace classifier: (1, 1280) ImageNet head -> single binary logit
+        backbone.classifier = nn.Linear(1280, 1)
+
+        self.model = backbone
+
+        if freeze_backbone:
+            # Freeze everything first …
+            for param in self.model.parameters():
+                param.requires_grad = False
+
+            # … then unfreeze the last 3 MBConv blocks and the classifier
+            for block in self.model.features[6:]:   # features[6], [7], [8] (conv head)
+                for param in block.parameters():
+                    param.requires_grad = True
+            for param in self.model.classifier.parameters():
+                param.requires_grad = True
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x)
+
+
+# A lightweight 3-layer convolutional network built entirely from scratch without pretrained weights.
+class CustomCNNCACClassifier(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+        def _block(in_ch, out_ch):
+            return nn.Sequential(
+                nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(2),
+            )
+
+        self.features = nn.Sequential(
+            _block(1,   32),   # 64 -> 32
+            _block(32,  64),   # 32 -> 16
+            _block(64,  128),  # 16 ->  8
+            _block(128, 256),  # 8  ->  4
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(256 * 4 * 4, 512),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(512, 1),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.classifier(self.features(x))
+
+
+
+
+_ARCHITECTURES = {"resnet18", "efficientnet", "custom"}
+
+
+# Return a configured CAC classifier for the requested architecture.
+# architecture: "resnet18" | "efficientnet" | "custom"
+# pretrained:     load ImageNet weights (ignored for "custom")
+# freeze_backbone: freeze early layers, fine-tune head only (ignored for "custom")
+def get_model(
+    architecture: str = "resnet18",
+    pretrained: bool = True,
+    freeze_backbone: bool = True,
+) -> nn.Module:
+    arch = architecture.lower()
+    if arch == "resnet18":
+        return ResNet18CACClassifier(pretrained=pretrained, freeze_backbone=freeze_backbone)
+    if arch == "efficientnet":
+        return EfficientNetB0CACClassifier(pretrained=pretrained, freeze_backbone=freeze_backbone)
+    if arch == "custom":
+        return CustomCNNCACClassifier()
+    raise ValueError(
+        f"Unknown architecture '{architecture}'. "
+        f"Choose from: {sorted(_ARCHITECTURES)}"
+    )
 
 
 # Print total, trainable and frozen parameter counts for a given model
@@ -67,14 +160,14 @@ def count_trainable_params(model: nn.Module) -> None:
 
 
 if __name__ == "__main__":
-    model = get_model(pretrained=True, freeze_backbone=True)
-    model.eval()
-
     dummy = torch.zeros(4, 1, 64, 64)  # batch of 4 greyscale 64x64 patches
-    with torch.no_grad():
-        out = model(dummy)
 
-    print(f"Input  shape : {tuple(dummy.shape)}")
-    print(f"Output shape : {tuple(out.shape)}")   # expected (4, 1)
-    print()
-    count_trainable_params(model)
+    for arch in ("resnet18", "efficientnet", "custom"):
+        model = get_model(architecture=arch, pretrained=True, freeze_backbone=True)
+        model.eval()
+        with torch.no_grad():
+            out = model(dummy)
+        print(f"\n[{arch}]")
+        print(f"  Input  : {tuple(dummy.shape)}")
+        print(f"  Output : {tuple(out.shape)}")   # expected (4, 1)
+        count_trainable_params(model)

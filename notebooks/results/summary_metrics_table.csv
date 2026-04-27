@@ -1,0 +1,5 @@
+Pipeline,MAE,RMSE,Median AE,Pearson r,p-value,Over-scored (%),Under-scored (%),Within +/-10 (%),MAE Reduction (%)
+Classical,183.7,309.2,109.6,0.544,0.0,65.2,26.1,17.4,-
+ResNet-18,126.2,278.1,38.2,0.686,0.0,49.3,29.0,40.6,31.3
+EfficientNet-B0,134.4,293.8,37.1,0.65,0.0,56.5,29.0,37.7,26.8
+Custom CNN,141.2,292.7,47.4,0.632,0.0,55.1,31.9,26.1,23.1

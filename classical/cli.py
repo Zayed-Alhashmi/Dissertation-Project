@@ -2,9 +2,9 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-# Show a dark themed launcher window — user can drag a folder onto it or click Browse.
+# Show a dark themed launcher window - user can drag a folder onto it or click Browse.
 def pick_folder(prompt: str = "Select the patient DICOM folder") -> str:
-    # CLI argument / drag-and-drop directly onto terminal — use immediately
+    # CLI argument / drag-and-drop directly onto terminal - use immediately
     if len(sys.argv) > 1:
         path = sys.argv[1].strip().strip("'\"")  # strip shell quoting
         path = os.path.normpath(path)
@@ -39,7 +39,7 @@ def _launcher_window(prompt: str) -> str:
 
     import tkinter as tk  # still needed for widgets
 
-    root.title("ProjectAnti — CAC Scorer")
+    root.title("ProjectAnti - CAC Scorer")
     root.configure(bg=BG)
     root.resizable(False, False)
 
@@ -51,7 +51,7 @@ def _launcher_window(prompt: str) -> str:
     # title
     tk.Label(root, text="CAC Scorer", font=("Helvetica", 22, "bold"),
              bg=BG, fg=FG).pack(pady=(36, 4))
-    tk.Label(root, text="Coronary Artery Calcium — Agatston Pipeline",
+    tk.Label(root, text="Coronary Artery Calcium - Agatston Pipeline",
              font=("Helvetica", 11), bg=BG, fg=FG_DIM).pack()
 
     # drop zone frame
@@ -82,7 +82,7 @@ def _launcher_window(prompt: str) -> str:
                 root.destroy()
             else:
                 _activate_zone("#e05252")
-                zone_label.config(text="That's not a folder — try again")
+                zone_label.config(text="That's not a folder - try again")
 
         root.drop_target_register(DND_FILES)
         root.dnd_bind("<<Drop>>", _on_drop)

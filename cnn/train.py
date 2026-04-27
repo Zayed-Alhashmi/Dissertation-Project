@@ -11,15 +11,15 @@ from cnn.model import get_model
 from cnn.dataset import get_dataloaders
 
 
-# Two-stage fine-tuning strategy:
-#   Stage 1 (epochs 1-10)  — backbone frozen, only layer4 + FC trained (fast convergence, low overfit risk)
-#   Stage 2 (epoch 11+)    — full backbone unfrozen, lr reduced 10x (slow, careful global refinement)
+# Two-stage fine-tuning strategy (pretrained architectures only):
+#   Stage 1 (epochs 1-10)  - backbone frozen, only head trained (fast convergence, low overfit risk)
+#   Stage 2 (epoch 11+)    - full backbone unfrozen, lr reduced 10x (slow, careful global refinement)
 def _unfreeze_all(model: nn.Module, optimizer: torch.optim.Optimizer, new_lr: float) -> None:
-    for param in model.model.parameters():
+    for param in model.parameters():
         param.requires_grad = True
     for group in optimizer.param_groups:  # update every param group in-place
         group["lr"] = new_lr
-    print(f"  [Stage 2] Full backbone unfrozen — lr reduced to {new_lr:.2e}")
+    print(f"  [Stage 2] Full backbone unfrozen - lr reduced to {new_lr:.2e}")
 
 
 # Run one training epoch and return the average loss
@@ -67,6 +67,7 @@ def _val_epoch(model, loader, criterion, device):
 
 def train(
     npz_path: str,
+    arch: str = "resnet18",
     epochs: int = 25,
     lr: float = 1e-4,
     batch_size: int = 32,
@@ -74,17 +75,24 @@ def train(
 ) -> None:
     os.makedirs(checkpoint_dir, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Architecture: {arch}")
     print(f"Device: {device}")
+
+    # Arch-specific output paths
+    ckpt_path = os.path.join(checkpoint_dir, f"best_model_{arch}.pt")
+    log_path  = os.path.join(checkpoint_dir, f"training_log_{arch}.csv")
 
     # Data
     print("\nBuilding dataloaders ...")
     train_loader, val_loader, class_weights = get_dataloaders(npz_path, batch_size)
 
-    # Model
-    model = get_model(pretrained=True, freeze_backbone=True)
+    # Model - custom CNN has no pretrained weights or freeze phase
+    pretrained     = arch != "custom"
+    freeze_backbone = arch != "custom"
+    model = get_model(architecture=arch, pretrained=pretrained, freeze_backbone=freeze_backbone)
     model = model.to(device)
 
-    # Loss — positive class upweighted to handle class imbalance
+    # Loss - positive class upweighted to handle class imbalance
     pos_weight = class_weights[1].to(device)
     criterion  = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
@@ -98,8 +106,7 @@ def train(
         optimizer, mode="min", patience=5, factor=0.5
     )
 
-    # CSV log
-    log_path = os.path.join(checkpoint_dir, "training_log.csv")
+    # Initialise CSV log
     with open(log_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["epoch", "train_loss", "val_loss", "val_acc"])
@@ -109,14 +116,14 @@ def train(
     best_epoch     = 0
     stage2_entered = False
 
-    print(f"\nStarting training — {epochs} epochs\n")
+    print(f"\nStarting training - {epochs} epochs\n")
 
     for epoch in range(1, epochs + 1):
 
-        # Stage 2: unfreeze full backbone after epoch 10
-        if epoch == 11 and not stage2_entered:
+        # Stage 2: unfreeze full backbone after epoch 10 (pretrained models only)
+        if pretrained and epoch == 11 and not stage2_entered:
             _unfreeze_all(model, optimizer, new_lr=lr / 10)
-            # Rebuild optimiser so all parameters are included
+            # Rebuild optimiser so newly unfrozen parameters are included
             optimizer = torch.optim.Adam(
                 model.parameters(), lr=lr / 10, weight_decay=1e-4
             )
@@ -139,7 +146,6 @@ def train(
             best_val_loss = val_loss
             best_val_acc  = val_acc
             best_epoch    = epoch
-            ckpt_path = os.path.join(checkpoint_dir, "best_model.pt")
             torch.save({"epoch": epoch, "model_state_dict": model.state_dict(),
                         "val_loss": val_loss, "val_acc": val_acc}, ckpt_path)
             print(f"  -> Checkpoint saved (val loss improved)")
@@ -151,21 +157,30 @@ def train(
 
     print(f"\nTraining complete.")
     print(f"Best val accuracy: {best_val_acc * 100:.1f}%  at epoch {best_epoch}")
-    print(f"Checkpoint saved to : {os.path.join(checkpoint_dir, 'best_model.pt')}")
+    print(f"Checkpoint saved to : {ckpt_path}")
     print(f"Training log saved to: {log_path}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train ResNet18 CAC classifier")
-    parser.add_argument("--npz",        type=str,   required=True,               help="Path to labelled patches .npz")
-    parser.add_argument("--epochs",     type=int,   default=25,                  help="Number of epochs (default 25)")
-    parser.add_argument("--lr",         type=float, default=1e-4,                help="Initial learning rate (default 1e-4)")
-    parser.add_argument("--batch_size", type=int,   default=32,                  help="Batch size (default 32)")
-    parser.add_argument("--ckpt_dir",   type=str,   default="cnn/checkpoints/",  help="Checkpoint output directory")
+    parser = argparse.ArgumentParser(description="Train CAC classifier")
+    parser.add_argument("--npz",        type=str,   required=True,
+                        help="Path to labelled patches .npz")
+    parser.add_argument("--arch",       type=str,   default="resnet18",
+                        choices=["resnet18", "efficientnet", "custom"],
+                        help="Model architecture (default: resnet18)")
+    parser.add_argument("--epochs",     type=int,   default=25,
+                        help="Number of epochs (default 25)")
+    parser.add_argument("--lr",         type=float, default=1e-4,
+                        help="Initial learning rate (default 1e-4)")
+    parser.add_argument("--batch_size", type=int,   default=32,
+                        help="Batch size (default 32)")
+    parser.add_argument("--ckpt_dir",   type=str,   default="cnn/checkpoints/",
+                        help="Checkpoint output directory")
     args = parser.parse_args()
 
     train(
         npz_path       = args.npz,
+        arch           = args.arch,
         epochs         = args.epochs,
         lr             = args.lr,
         batch_size     = args.batch_size,

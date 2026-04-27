@@ -5,22 +5,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 from classical.load_ct import load_dicom_series
 from classical.cli import pick_folder
-from classical.utils import apply_window
-from classical.score_patient import process_slice
+from classical.utils import (
+    apply_window, calcium_mask, lung_guided_roi_mask, is_heart_level_slice,
+    connected_lesions, filter_lesions_by_area, filter_elongated_lesions,
+    remove_bone_like_components,
+)
+from classical.scoring import agatston_slice_score
+from classical.score_patient import process_slice, _get_cnn_classifier
 
-# To manually scroll through the slices, red shows calcium
+# Scroll through CT slices with arrow keys.
+# mode="classical" - red overlay for calcium (unchanged behaviour).
+# mode="hybrid"    - red = CNN-kept true CAC, blue = CNN-rejected false positives.
 class SliceViewer:
-    def __init__(self, series):
+    def __init__(self, series, mode: str = "classical"):
         self.series = series
-        self.idx = 0
+        self.mode   = mode
+        self.idx    = 0
 
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
         self.fig.patch.set_facecolor("black")
         self.ax.set_facecolor("black")
         plt.subplots_adjust(left=0, right=1, top=0.95, bottom=0)
 
-        # open the window in full screen
-        # Windows vs Mac, so we try both and silently ignore any error.
+        # Open the window in full screen - try Windows then Mac API
         mng = plt.get_current_fig_manager()
         try:
             mng.window.state("zoomed")
@@ -30,44 +37,108 @@ class SliceViewer:
             except Exception:
                 pass
 
-        img, overlay_data, score = self._compute(self.idx)
+        img, overlay_data, title_str = self._compute(self.idx)
 
-        self.base= self.ax.imshow(img, cmap="gray")
-        self.overlay = self.ax.imshow(overlay_data, cmap="Reds",
-                                      alpha=0.85, vmin=0, vmax=1)
-        self.ax.set_title(self._title(score), color="white", pad=12, fontsize=14)
+        self.base = self.ax.imshow(img, cmap="gray")
+        # RGBA overlay works for both modes: classical uses a single-channel Red map,
+        # hybrid uses a full RGBA array with transparent background.
+        if self.mode == "hybrid":
+            self.overlay = self.ax.imshow(overlay_data)  # overlay_data is RGBA (H,W,4)
+        else:
+            self.overlay = self.ax.imshow(overlay_data, cmap="Reds", alpha=0.85, vmin=0, vmax=1)
+        self.ax.set_title(title_str, color="white", pad=12, fontsize=14)
         self.ax.axis("off")
 
         self.fig.canvas.mpl_connect("key_press_event", self.on_key)
         plt.show()
 
     # Helpers
-    # Conver bool mask to float aray where true is 1 and false is Nan
-    def _mask_to_overlay(self, mask):
-        overlay = np.where(mask, 1.0, np.nan)
-        return overlay
 
-    # Run full CAC pipeline on slice idx and return display data
+    # Boolean mask → float array: True=1.0, False=NaN (used for classical cmap="Reds" overlay)
+    def _mask_to_overlay(self, mask):
+        return np.where(mask, 1.0, np.nan)
+
+    # Build an RGBA (H, W, 4) overlay from two boolean masks.
+    # kept_mask  → red   [1, 0, 0, alpha]
+    # rej_mask   → blue  [0, 0.4, 1, alpha]
+    def _masks_to_rgba(self, kept_mask, rej_mask, alpha: float = 0.6):
+        h, w  = kept_mask.shape
+        rgba  = np.zeros((h, w, 4), dtype=np.float32)  # fully transparent by default
+        rgba[kept_mask] = [1.0, 0.0,  0.0,  alpha]     # red   - true CAC
+        rgba[rej_mask]  = [0.0, 0.4,  1.0,  alpha]     # blue  - CNN-rejected FP
+        return rgba
+
+    # Run 7 classical steps and return (labels_array, blob_list, score_of_all_blobs).
+    # This mirrors the internal logic of process_slice without the CNN step.
+    def _classical_blobs(self, hu, spacing):
+        from skimage.measure import regionprops
+        if not is_heart_level_slice(hu):
+            return None, [], 0.0
+
+        mask = calcium_mask(hu, threshold=130.0)
+        roi  = lung_guided_roi_mask(hu)
+        mask = mask & roi
+
+        labels, _ = connected_lesions(mask)
+        mask, _   = filter_lesions_by_area(labels, spacing, min_area_mm2=1.0, max_area_mm2=35.0)
+        labels, _ = connected_lesions(mask.astype(bool))
+        mask      = filter_elongated_lesions(labels, spacing, max_eccentricity=0.97, min_solidity=0.30)
+        mask      = remove_bone_like_components(hu, mask.astype(bool), spacing,
+                                                peak_hu_thr=550.0, area_thr_mm2=15.0)
+        labels, _ = connected_lesions(mask.astype(bool))
+        blobs     = regionprops(labels)
+        score     = agatston_slice_score(hu, mask, spacing, min_area_mm2=1.0)
+        return labels, blobs, score
+
+    # Rebuild a boolean mask from a subset of regionprops objects
+    def _blobs_to_mask(self, labels, blobs, shape):
+        out = np.zeros(shape, dtype=bool)
+        for b in blobs:
+            out |= (labels == b.label)
+        return out
+
+    # Compute display data for the current slice index.
+    # Returns (greyscale_img, overlay_data, title_string).
     def _compute(self, idx):
         path, hu, spacing = self.series[idx]
-        img = apply_window(hu, level=50, width=350)
-        mask, score = process_slice(hu, spacing)
-
-        # non heart level slices return (None, None) and show empty overlay
-        if mask is None:
-            mask  = np.zeros(hu.shape, dtype=bool)
-            score = 0.0
-
-        return img, self._mask_to_overlay(mask), score
-
-    def _title(self, score):
-        filename = os.path.basename(self.series[self.idx][0])
+        img      = apply_window(hu, level=50, width=350)
+        filename = os.path.basename(path)
         try:
             slice_num = int(filename.split("-")[-1].split(".")[0])
-            label     = f"Slice {slice_num} | {filename}"
+            slice_label = f"Slice {slice_num}"
         except ValueError:
-            label = filename
-        return f"{label} | Slice Agatston: {score:.2f}"
+            slice_label = filename
+
+        if self.mode == "hybrid":
+            labels, all_blobs, score = self._classical_blobs(hu, spacing)
+
+            if labels is None:  # not at heart level
+                empty = np.zeros((*hu.shape, 4), dtype=np.float32)  # transparent RGBA
+                return img, empty, f"{slice_label} | Score: 0.0 | CNN kept: 0 | CNN rejected: 0"
+
+            # CNN FILTER - step 8
+            kept_blobs = _get_cnn_classifier().filter_blobs(hu, all_blobs, spacing)
+            kept_ids   = {b.label for b in kept_blobs}
+            rej_blobs  = [b for b in all_blobs if b.label not in kept_ids]  # everything the CNN dropped
+
+            kept_mask = self._blobs_to_mask(labels, kept_blobs, hu.shape)
+            rej_mask  = self._blobs_to_mask(labels, rej_blobs,  hu.shape)
+
+            # Recompute score using only CNN-approved blobs
+            cnn_score = agatston_slice_score(hu, kept_mask, spacing, min_area_mm2=1.0)
+            overlay   = self._masks_to_rgba(kept_mask, rej_mask)
+            title     = (f"{slice_label} | Score: {cnn_score:.1f} | "
+                         f"CNN kept: {len(kept_blobs)} blobs | CNN rejected: {len(rej_blobs)} blobs")
+            return img, overlay, title
+
+        else:  # classical - behaviour unchanged
+            mask, score = process_slice(hu, spacing)
+            if mask is None:
+                mask  = np.zeros(hu.shape, dtype=bool)
+                score = 0.0
+            overlay = self._mask_to_overlay(mask)
+            title   = f"{slice_label} | Slice Agatston: {score:.2f}"
+            return img, overlay, title
 
     # Event handler
     def on_key(self, event):
@@ -78,10 +149,10 @@ class SliceViewer:
         else:
             return
 
-        img, overlay_data, score = self._compute(self.idx)
+        img, overlay_data, title_str = self._compute(self.idx)
         self.base.set_data(img)
         self.overlay.set_data(overlay_data)
-        self.ax.set_title(self._title(score), color="white", pad=12, fontsize=14)
+        self.ax.set_title(title_str, color="white", pad=12, fontsize=14)
         self.fig.canvas.draw_idle()
 
 
@@ -146,9 +217,11 @@ class PatchViewer:
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="CT slice / patch viewer")
     parser.add_argument("--patches", metavar="NPZ", default=None,
-                        help="Path to a labelled patches .npz file — opens the patch viewer")
+                        help="Path to a labelled patches .npz - opens the patch viewer")
+    parser.add_argument("--mode", choices=["classical", "hybrid"], default="classical",
+                        help="classical = red calcium overlay (default); hybrid = red kept + blue rejected")
     args, _ = parser.parse_known_args()
 
     if args.patches:
@@ -157,6 +230,6 @@ if __name__ == "__main__":
     else:
         folder = pick_folder("Select the patient DICOM folder")
         series = load_dicom_series(folder)
-        print(f"Loaded {len(series)} slices.")
+        print(f"Loaded {len(series)} slices.  [mode={args.mode}]")
         print("Use \u2190 and \u2192 arrow keys to scroll.")
-        SliceViewer(series)
+        SliceViewer(series, mode=args.mode)

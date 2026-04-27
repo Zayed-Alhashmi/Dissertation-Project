@@ -11,18 +11,16 @@ env/
 # IDE / editor
 .vscode/
 .idea/
-*.code-workspace
+*.swp
 
 # macOS
 .DS_Store
 
-# Jupyter
-.ipynb_checkpoints/
-
-# Data (large patient files — keep out of repo)
-data/raw/
-data/processed/
-
-# Temp
-tempCodeRunnerFile.pycnn/checkpoints/*.pt
+# Project data - never commit patient data or model weights
+data/
+*.dcm
+*.npz
 *.pt
+
+# Jupyter checkpoints only (not the notebooks themselves)
+.ipynb_checkpoints/

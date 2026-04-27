@@ -1,6 +1,22 @@
-# Automated CAC Scoring from Chest CT using Classical Pipeline + CNN
+# ProjectAnti — Automated CAC Scoring from Chest CT
 
-This project implements an automated Coronary Artery Calcium (CAC) scoring system applied to real chest CT scans from the Stanford AIMI public dataset. It computes Agatston scores using a classical image processing pipeline and lays the groundwork for a hybrid approach that combines the classical method with a CNN-based classifier to reduce false positives. The system is validated against ground truth scores across 29 patients, with metrics including MAE, RMSE, and Pearson correlation.
+**BSc Computer Science with Artificial Intelligence — University of Leeds, 2026**  
+**Author:** Zayed Khaled Omar Alhashmi
+
+---
+
+## Overview
+
+This project implements an automated **Coronary Artery Calcium (CAC) scoring** system applied to non-gated chest CT scans from the Stanford AIMI COCA dataset. It computes Agatston scores using a classical image processing pipeline, enhanced by a hybrid approach that combines classical detection with a CNN-based false positive filter.
+
+The system is validated against ground truth scores across **69 patients**, with the following key results:
+
+| Pipeline | MAE | RMSE | Pearson r | MAE Reduction |
+|---|---|---|---|---|
+| Classical (Baseline) | 183.7 | 309.1 | 0.544 | - |
+| Hybrid · ResNet-18 | 126.2 | 278.0 | 0.686 | **31%** |
+| Hybrid · EfficientNet-B0 | 134.4 | 293.8 | 0.650 | 27% |
+| Hybrid · Custom CNN | 141.2 | 292.7 | 0.632 | 23% |
 
 ---
 
@@ -10,73 +26,7 @@ This project implements an automated Coronary Artery Calcium (CAC) scoring syste
 pip install -r requirements.txt
 ```
 
-> Python 3.10+ recommended.
-
----
-
-## Usage
-
-### Classical Pipeline
-
-Run the classical Agatston scoring pipeline on a single patient folder:
-
-```bash
-python src/score_patient.py
-```
-
-A folder picker window will open. Select the folder containing the patient's `.dcm` files. The total Agatston score will be printed to the terminal.
-
----
-
-### Batch Validation (Classical)
-
-Compare the classical pipeline against ground truth scores across all patients:
-
-```bash
-python src/validate.py
-```
-
-Select the data root folder (which contains one subfolder per patient) and the `scores.csv` ground truth file. Outputs MAE, RMSE, and Pearson r.
-
----
-
-### CNN Training
-
-_Coming soon — train the patch CNN classifier on auto-labelled DICOM data._
-
-```bash
-# python src/train.py --data_dir /path/to/patient_folders
-```
-
----
-
-### Hybrid Pipeline
-
-_Coming soon — classical pipeline with CNN re-scoring to reduce false positives._
-
-```bash
-# python src/score_patient_hybrid.py
-```
-
----
-
-### Streamlit Demo App
-
-_Coming soon — interactive web UI for slice-by-slice visualisation and scoring._
-
-```bash
-# streamlit run src/app.py
-```
-
----
-
-## Slice Visualiser
-
-Scroll through CT slices with a red overlay highlighting detected calcium:
-
-```bash
-python src/visualize.py
-```
+> Python 3.10+ recommended. A virtual environment is strongly advised.
 
 ---
 
@@ -84,37 +34,236 @@ python src/visualize.py
 
 ```
 ProjectAnti/
-├── src/
+├── classical/
+│   ├── __init__.py
 │   ├── load_ct.py          # DICOM loading and HU conversion
-│   ├── utils.py            # All image processing (ROI, filtering, detection)
-│   ├── scoring.py          # Agatston weight table and slice score
-│   ├── score_patient.py    # Full pipeline orchestration
-│   ├── validate.py         # Batch validation against ground truth
-│   ├── cli.py              # GUI folder picker (drag-and-drop + browse)
+│   ├── utils.py            # Image processing: ROI, thresholding, aorta exclusion
+│   ├── scoring.py          # Agatston weight table and per-slice scoring
+│   ├── score_patient.py    # Full pipeline orchestration (classical + hybrid)
+│   ├── validate.py         # Batch validation against ground truth CSV
+│   ├── cli.py              # GUI folder picker (tkinter)
 │   └── visualize.py        # Matplotlib slice viewer with calcium overlay
-├── data/                   # Patient DICOM folders (not committed)
+├── cnn/
+│   ├── __init__.py
+│   ├── model.py            # ResNet-18, EfficientNet-B0, Custom CNN definitions
+│   ├── dataset.py          # Patch dataset loader
+│   ├── train.py            # CNN training script
+│   ├── evaluate.py         # Patch-level evaluation metrics
+│   ├── classifier.py       # CACClassifier wrapper used by hybrid pipeline
+│   ├── patch_extractor.py  # Extracts 64×64 patches from DICOM blobs
+│   ├── label_patches.py    # Smart patch labelling using ground truth ratios
+│   ├── build_dataset.py    # Full patch extraction pipeline across all patients
+│   └── checkpoints/        # Saved model weights (gitignored)
+├── app/
+│   └── streamlit_app.py    # Streamlit clinical web application
+├── notebooks/
+│   └── results_analysis.ipynb  # Comprehensive results notebook (14 sections)
+├── results/                # Output figures and CSVs (generated by notebook)
+├── data/                   # Patient DICOM folders and scores.csv (gitignored)
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## Results
+## Usage
 
-| Metric | Classical Pipeline | Hybrid Pipeline (CNN) |
-|---|---|---|
-| MAE | TBD | TBD |
-| RMSE | TBD | TBD |
-| Pearson r | TBD | TBD |
+### 1. Score a Single Patient (Classical)
 
----
+Run the classical Agatston scoring pipeline on a single patient folder:
 
-## Dataset
+```bash
+python classical/score_patient.py --mode classical
+```
 
-Stanford AIMI Chest CT dataset. Patient DICOM files and ground truth Agatston scores (`scores.csv`) are not included in this repository due to data governance constraints.
+A folder picker window will open. Select the folder containing the patient's `.dcm` files. The total Agatston score will be printed to the terminal.
 
 ---
 
-## Author
+### 2. Score a Single Patient (Hybrid - CNN Enhanced)
 
-Zayed Alhashmi — Individual Project, 2025/2026
+Run the hybrid pipeline with a CNN false positive filter:
+
+```bash
+# Using ResNet-18 (recommended)
+python classical/score_patient.py --mode hybrid --arch resnet18
+
+# Using EfficientNet-B0
+python classical/score_patient.py --mode hybrid --arch efficientnet
+
+# Using the custom CNN
+python classical/score_patient.py --mode hybrid --arch custom
+```
+
+---
+
+### 3. Visualise CT Slices with Calcium Overlay
+
+Scroll through CT slices with a red overlay highlighting detected calcium candidates:
+
+```bash
+# Classical overlay
+python classical/visualize.py --mode classical
+
+# Hybrid overlay (red = CNN-kept, blue = CNN-rejected)
+python classical/visualize.py --mode hybrid --arch resnet18
+```
+
+---
+
+### 4. Batch Validation Against Ground Truth
+
+Compare all pipelines against ground truth scores across all patients:
+
+```bash
+# Classical only
+python classical/validate.py --mode classical
+
+# Single hybrid model
+python classical/validate.py --mode hybrid --arch resnet18
+
+# Side-by-side comparison of classical vs hybrid
+python classical/validate.py --mode compare --arch resnet18
+python classical/validate.py --mode compare --arch efficientnet
+python classical/validate.py --mode compare --arch custom
+```
+
+Outputs MAE, RMSE, and Pearson r to the terminal.
+
+---
+
+### 5. Build the Patch Dataset
+
+Extract labelled patches from all patient DICOM folders (required before CNN training):
+
+```bash
+python cnn/build_dataset.py
+```
+
+Saves labelled patches to `data/patches_labelled_smart.npz`.  
+**Note:** Requires `data/raw/` to contain patient DICOM folders and `scores.csv`.
+
+---
+
+### 6. Train the CNN
+
+Train one of the three CNN architectures on the patch dataset:
+
+```bash
+# Train ResNet-18 (recommended)
+python cnn/train.py --arch resnet18 --epochs 50
+
+# Train EfficientNet-B0
+python cnn/train.py --arch efficientnet --epochs 50
+
+# Train the custom CNN
+python cnn/train.py --arch custom --epochs 50
+```
+
+Checkpoints are saved to `cnn/checkpoints/best_model_{arch}.pt`.  
+Training logs are saved to `cnn/checkpoints/training_log_{arch}.csv`.
+
+---
+
+### 7. Evaluate CNN Patch-Level Performance
+
+```bash
+python cnn/evaluate.py --arch resnet18
+python cnn/evaluate.py --arch efficientnet
+python cnn/evaluate.py --arch custom
+```
+
+Outputs: Accuracy, Precision, Recall, F1, and ROC AUC.
+
+---
+
+### 8. Run the Results Analysis Notebook
+
+Open the comprehensive results notebook in VS Code or JupyterLab:
+
+```bash
+jupyter notebook notebooks/results_analysis.ipynb
+# or
+code notebooks/results_analysis.ipynb
+```
+
+The notebook contains 14 sections including scatter plots, MAE comparisons, training curves, risk category analysis, Bland-Altman agreement plots, correlation heatmaps, and a full results summary. All figures are saved to `results/` at 300 DPI.
+
+---
+
+### 9. Run the Streamlit Web Application
+
+Launch the interactive clinical CAC scoring application:
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+The app features:
+- Classical and Hybrid (CNN) pipeline modes
+- Three CNN architecture options (ResNet-18, EfficientNet-B0, Custom CNN)
+- MESA percentile gauge chart (Hoff 2001 / McClelland 2006 reference data)
+- Per-slice breakdown table with inline CT image viewer
+- Clinical risk category interpretation
+- Age and sex-adjusted population percentile
+
+---
+
+## Data
+
+**Dataset:** Stanford AIMI COCA (Coronary Artery Calcium scoring) dataset.  
+Patient DICOM files and ground truth Agatston scores (`scores.csv`) are **not included** in this repository due to data governance constraints.
+
+Expected data layout:
+```
+data/
+└── raw/
+    ├── scores.csv          # Ground truth: filename, LCA, LAD, LCX, RCA, total
+    ├── 1/                  # Patient folder
+    │   ├── IM-0001-0001.dcm
+    │   └── ...
+    ├── 100/
+    └── ...
+```
+
+---
+
+## CNN Architecture Summary
+
+| Model | Pretrained | Patch Accuracy | AUC | MAE (Pipeline) |
+|---|---|---|---|---|
+| ResNet-18 | Yes (ImageNet) | 90.7% | 0.962 | 126.2 |
+| EfficientNet-B0 | Yes (ImageNet) | 73.9% | 0.832 | 134.4 |
+| Custom CNN | No (from scratch) | 79.5% | 0.868 | 141.2 |
+
+Patches are 64×64 pixels, normalised to [0, 1] via `np.clip(hu, 0, 1000) / 1000`.
+
+---
+
+## Key References
+
+**Foundational - Agatston Scoring:**
+1. Agatston, A.S. et al. (1990). Quantification of coronary artery calcium using ultrafast CT. *JACC*, 15(4), 827–832.
+
+**Most directly comparable to this work - automated CAC from non-gated CT:**
+2. Lessmann, N. et al. (2017). Automatic calcium scoring in low-dose chest CT using deep neural networks with dilated convolutions. *IEEE TMI*, 37(12), 2695–2703.
+3. de Vos, B.D. et al. (2019). Direct automatic coronary calcium scoring in cardiac and chest CT. *IEEE TMI*, 38(9), 2127–2138.
+4. Wolterink, J.M. et al. (2016). Automatic coronary artery calcium scoring in cardiac CT angiography using paired convolutional neural networks. *Medical Image Analysis*, 34, 123–136.
+5. Išgum, I. et al. (2007). Multi-atlas-based segmentation with local decision fusion - application to cardiac and aorta segmentation in CT scans. *IEEE TMI*, 26(8), 1077–1087.
+
+**CNN architectures used:**
+6. He, K. et al. (2016). Deep residual learning for image recognition. *CVPR*, 770–778.
+7. Tan, M. & Le, Q. (2019). EfficientNet: Rethinking model scaling for convolutional neural networks. *ICML*.
+
+**MESA percentile reference data:**
+8. Hoff, J.A. et al. (2001). Age and sex distributions of subclinical coronary artery calcium detected by electron beam tomography in 35,246 adults. *Am J Cardiol*, 87(12), 1335–1339.
+9. McClelland, R.L. et al. (2006). Distribution of coronary artery calcium by race, gender, and age: results from the Multi-Ethnic Study of Atherosclerosis (MESA). *Circulation*, 113(1), 30–37.
+
+**Dataset:**
+10. Guo, Y. et al. (2023). Automated coronary artery calcium scoring - COCA dataset. Stanford AIMI Shared Datasets. https://stanfordaimi.azurewebsites.net/datasets/e8ca74dc-8dd4-4340-815a-60b41f6cb2aa
+
+---
+
+## License
+
+For academic use only. Patient data not included. Model weights not included.

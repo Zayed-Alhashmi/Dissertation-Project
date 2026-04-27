@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import train_test_split
 
 
-# Applies random flips, rotation, and brightness jitter to a numpy patch in-place.
+# Injects random optical distortions like rotations and brightness changes to artificially expand training data.
 def _augment(patch: np.ndarray) -> np.ndarray:
     if np.random.rand() < 0.5:
         patch = np.fliplr(patch)
@@ -48,7 +48,7 @@ class PatchDataset(Dataset):
         return tensor, label
 
 
-# Splits the dataset into train and val loaders using stratified sampling and computes class weights for imbalanced training.
+# Divides the total data into a learning set and a testing set, balancing the rarity of actual calcium lesions.
 def get_dataloaders(
     npz_path: str,
     batch_size: int = 32,
@@ -90,7 +90,7 @@ def get_dataloaders(
     class_weights = torch.tensor([weight_neg, weight_pos], dtype=torch.float32)
 
     print(f"  Train: {len(train_idx)} samples  |  Val: {len(val_idx)} samples")
-    print(f"  Class weights  — neg (0): {weight_neg:.3f}  pos (1): {weight_pos:.3f}")
+    print(f"  Class weights  - neg (0): {weight_neg:.3f}  pos (1): {weight_pos:.3f}")
 
     return train_loader, val_loader, class_weights
 
@@ -112,4 +112,4 @@ if __name__ == "__main__":
     full = PatchDataset(npz_path)
     n_pos = int((full.labels == 1).sum())
     n_neg = int((full.labels == 0).sum())
-    print(f"\nFull dataset — CAC (1): {n_pos}  |  FP (0): {n_neg}  |  Total: {len(full)}")
+    print(f"\nFull dataset - CAC (1): {n_pos}  |  FP (0): {n_neg}  |  Total: {len(full)}")
