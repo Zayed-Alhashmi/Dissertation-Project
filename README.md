@@ -1,7 +1,6 @@
 # ProjectAnti — Automated CAC Scoring from Chest CT
 
-**BSc Computer Science with Artificial Intelligence**
-**University of Leeds, 2026**  
+**BSc Computer Science with Artificial Intelligence, University of Leeds, 2026**  
 **Author:** Zayed Khaled Omar Alhashmi
 
 ---
