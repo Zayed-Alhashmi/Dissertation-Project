@@ -26,7 +26,7 @@ The system is validated against ground truth scores across **69 patients**, with
 pip install -r requirements.txt
 ```
 
-> Python 3.10+ recommended. A virtual environment is strongly advised.
+> Python 3.10+ is recommended.
 
 ---
 
