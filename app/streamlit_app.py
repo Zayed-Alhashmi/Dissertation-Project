@@ -31,20 +31,21 @@ section.main > div { padding-top: 0 !important; }
     box-shadow: 2px 0 12px rgba(0,0,0,0.04) !important;
 }
 [data-testid="stSidebar"] * { color: #334155 !important; }
-[data-testid="stSidebar"] > div:first-child { padding-top: 0.5rem !important; }
-[data-testid="stSidebar"] > div { padding-top: 0.5rem !important; }
-[data-testid="stSidebarContent"] { padding-top: 0.5rem !important; }
-section[data-testid="stSidebar"] > div:first-child > div { padding-top: 0 !important; }
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0 !important; }
-/* Reduce Streamlit default sidebar top padding */
-[data-testid="stSidebar"] > div:first-child { padding-top: 1.5rem !important; margin-top: 0 !important; }
+[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; margin-top: 0 !important; }
+[data-testid="stSidebar"] > div { padding-top: 0 !important; margin-top: 0 !important; }
+[data-testid="stSidebarContent"] { padding-top: 0 !important; margin-top: 0 !important; }
+[data-testid="stSidebarUserContent"] { padding-top: 0 !important; margin-top: 0 !important; }
+[data-testid="stSidebarInternalContainer"] { padding-top: 0 !important; margin-top: 0 !important; }
+section[data-testid="stSidebar"] > div:first-child > div { padding-top: 0 !important; margin-top: 0 !important; }
+section[data-testid="stSidebar"] > div > div:first-child { padding-top: 0 !important; margin-top: 0 !important; }
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0 !important; padding-top: 0 !important; margin-top: 0 !important; }
 [data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2 { color: #0f172a !important; font-weight: 700 !important; }
 [data-testid="stSidebar"] hr { border-color: #f1f5f9 !important; }
 [data-testid="stSidebar"] a { color: #2563eb !important; text-decoration: none !important; }
 [data-testid="stSidebar"] label { color: #475569 !important; font-size: 13px !important; }
-/* Force sidebar always visible — hide all collapse/close controls */
+/* Force sidebar always visible — hide collapse/close header entirely */
+[data-testid="stSidebarHeader"] { display: none !important; height: 0 !important; padding: 0 !important; margin: 0 !important; }
 [data-testid="stSidebar"] { transform: translateX(0) !important; min-width: 244px !important; visibility: visible !important; }
-[data-testid="stSidebar"] button { display: none !important; }
 [data-testid="collapsedControl"] { display: none !important; }
 
 /* -- Risk badges -- */
@@ -71,16 +72,50 @@ section[data-testid="stSidebar"] > div:first-child > div { padding-top: 0 !impor
     align-items: center; justify-content: center; font-size: 12px;
 }
 
-/* -- Buttons -- */
-div[data-testid="stButton"] > button {
+/* -- Buttons: exhaustive selector set to override Streamlit's dark theme -- */
+.stButton > button,
+.stButton button,
+button[kind="secondary"],
+button[kind="primary"],
+button[data-testid="baseButton-secondary"],
+button[data-testid="baseButton-primary"],
+div[data-testid="stButton"] > button,
+[class*="stButton"] button,
+[class*="ButtonContainer"] button {
     background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
-    color: white !important; border: none !important;
-    border-radius: 10px !important; font-weight: 600 !important;
-    font-size: 15px !important; padding: 12px 28px !important;
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-color: transparent !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 10px 20px !important;
     box-shadow: 0 4px 14px rgba(37,99,235,0.35) !important;
-    transition: all 0.2s !important; letter-spacing: 0.01em !important;
+    transition: all 0.2s ease !important;
+    letter-spacing: 0.01em !important;
 }
-div[data-testid="stButton"] > button:hover {
+.stButton > button *,
+.stButton button *,
+button[kind="secondary"] *,
+button[kind="primary"] *,
+button[data-testid="baseButton-secondary"] *,
+button[data-testid="baseButton-primary"] *,
+div[data-testid="stButton"] > button * {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+}
+.stButton > button:hover,
+.stButton button:hover,
+button[kind="secondary"]:hover,
+button[kind="primary"]:hover,
+button[data-testid="baseButton-secondary"]:hover,
+button[data-testid="baseButton-primary"]:hover,
+div[data-testid="stButton"] > button:hover,
+[class*="stButton"] button:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    background-color: #3b82f6 !important;
+    color: #ffffff !important;
     transform: translateY(-1px) !important;
     box-shadow: 0 6px 20px rgba(37,99,235,0.45) !important;
 }
@@ -512,18 +547,37 @@ with tab_scanner:
 </div>
     """, unsafe_allow_html=True)
     
-    uploaded_files = st.file_uploader("Upload", type=["dcm"], accept_multiple_files=True,
-                                      label_visibility="collapsed")
+    # Dynamic key so "Clear Files" forces a full widget reset
+    if "uploader_key" not in st.session_state:
+        st.session_state["uploader_key"] = 0
+
+    uploaded_files = st.file_uploader(
+        "Upload", type=["dcm"], accept_multiple_files=True,
+        label_visibility="collapsed",
+        key=f"uploader_{st.session_state['uploader_key']}"
+    )
+
     if uploaded_files:
-        st.markdown(f"""
+        badge_col, clear_col = st.columns([3, 1])
+        with badge_col:
+            st.markdown(f"""
 <div style="display:inline-flex; align-items:center; gap:8px;
                     background:#dcfce7; color:#15803d; border-radius:100px;
                     padding:6px 16px; font-size:14px; font-weight:600; margin:6px 0;
                     box-shadow:0 1px 4px rgba(21,128,61,0.15);">
           ✓ &nbsp;{len(uploaded_files)} DICOM files selected
 </div>""", unsafe_allow_html=True)
-    
+        with clear_col:
+            st.markdown("<div style='padding-top:4px;'></div>", unsafe_allow_html=True)
+            if st.button("✕ Clear Files", use_container_width=True):
+                st.session_state["uploader_key"] += 1
+                # Also clear any previous results so they don't linger
+                for k in ("results", "scored_slices", "mode_used", "n_slices", "viewing_slice"):
+                    st.session_state.pop(k, None)
+                st.rerun()
+
     uploaded = uploaded_files or None
+
     
     
     # (Step 2: Run)
@@ -639,7 +693,6 @@ with tab_scanner:
     
         # MESA Percentile
         ref = get_avg_ref(pt_sex, pt_age)
-        card_open(border_color="#2563eb")
         section_label("MESA Population Percentile")
     
         if ref is None:
@@ -693,11 +746,9 @@ with tab_scanner:
             with cc:
                 st.image(buf, width=900)
     
-        card_close()
-    
+
         # Scoring slices
         if scored_slices:
-            card_open()
             section_label("Scoring Slices")
     
             h1, h2, h3 = st.columns([5, 1, 1])
@@ -734,7 +785,6 @@ with tab_scanner:
                     st.image(hu_to_uint8(v_hu),
                              caption=f"{v_name}  |  Score: {v_score:.1f}", width=560)
     
-            card_close()
         else:
             st.info("No calcified lesions detected in any slice.")
     
