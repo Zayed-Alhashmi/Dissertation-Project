@@ -426,7 +426,7 @@ with st.sidebar:
         arch_label = st.selectbox("Model", 
             ["ResNet-18", "EfficientNet-B0", "Custom CNN"], 
             index=0, label_visibility="collapsed")
-        arch_map = {"ResNet-18": "resnet18", "EfficientNet-B0": "efficientnet_b0", "Custom CNN": "custom"}
+        arch_map = {"ResNet-18": "resnet18", "EfficientNet-B0": "efficientnet", "Custom CNN": "custom"}
         arch = arch_map[arch_label]
 
     st.markdown("---")
