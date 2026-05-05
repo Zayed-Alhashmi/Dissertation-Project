@@ -16,6 +16,30 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap');
 
+/* Replicate config.toml [theme] block directly in Python */
+:root {
+    --primary-color: #2563eb;
+    --background-color: #eef2f7;
+    --secondary-background-color: #ffffff;
+    --text-color: #0f172a;
+}
+/* Force Streamlit's own CSS variables (used internally by the framework) */
+.stApp, [data-testid="stAppViewContainer"] {
+    --primary-color: #2563eb !important;
+    background-color: #eef2f7 !important;
+    color: #0f172a !important;
+}
+/* Global text colour override */
+html, body, [class*="css"], p, span, div, li, td, th, label {
+    color: #0f172a;
+}
+/* Streamlit's widget accent / highlight colour */
+.stSlider [data-baseweb="slider"] [role="slider"] { background-color: #2563eb !important; }
+.stRadio [data-baseweb="radio"] [data-checked="true"] div { background-color: #2563eb !important; }
+.stCheckbox [data-baseweb="checkbox"] [data-checked="true"] div { background-color: #2563eb !important; }
+[data-testid="stTab"][aria-selected="true"] { border-bottom-color: #2563eb !important; color: #2563eb !important; }
+a { color: #2563eb !important; }
+
 *, html, body { font-family: 'Inter', sans-serif !important; }
 
 /* App background */
@@ -43,7 +67,7 @@ section[data-testid="stSidebar"] > div > div:first-child { padding-top: 0 !impor
 [data-testid="stSidebar"] hr { border-color: #f1f5f9 !important; }
 [data-testid="stSidebar"] a { color: #2563eb !important; text-decoration: none !important; }
 [data-testid="stSidebar"] label { color: #475569 !important; font-size: 13px !important; }
-/* Force sidebar always visible — hide collapse/close header entirely */
+/* Force sidebar always visible - hide collapse/close header entirely */
 [data-testid="stSidebarHeader"] { display: none !important; height: 0 !important; padding: 0 !important; margin: 0 !important; }
 [data-testid="stSidebar"] { transform: translateX(0) !important; min-width: 244px !important; visibility: visible !important; }
 [data-testid="collapsedControl"] { display: none !important; }
