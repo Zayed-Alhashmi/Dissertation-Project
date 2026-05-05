@@ -42,8 +42,10 @@ section[data-testid="stSidebar"] > div:first-child > div { padding-top: 0 !impor
 [data-testid="stSidebar"] hr { border-color: #f1f5f9 !important; }
 [data-testid="stSidebar"] a { color: #2563eb !important; text-decoration: none !important; }
 [data-testid="stSidebar"] label { color: #475569 !important; font-size: 13px !important; }
-section[data-testid="collapsedControl"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
-section[data-testid="collapsedControl"] svg { fill: #64748b !important; }
+/* Force sidebar always visible — hide all collapse/close controls */
+[data-testid="stSidebar"] { transform: translateX(0) !important; min-width: 244px !important; visibility: visible !important; }
+[data-testid="stSidebar"] button { display: none !important; }
+[data-testid="collapsedControl"] { display: none !important; }
 
 /* -- Risk badges -- */
 .rbadge { display:inline-flex; align-items:center; padding:6px 20px; border-radius:100px;
@@ -126,6 +128,7 @@ div.element-container:hover { outline:none !important; background:transparent !i
 h1 a, h2 a, h3 a, h4 a, h5 a, h6 a, .header-anchor, a[href^="#"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # MESA reference data (Hoff 2001 / McClelland MESA 2006)
@@ -712,7 +715,7 @@ with tab_scanner:
                 c2.markdown(f"<div style='font-size:13px;font-weight:700;color:#2563eb;padding:4px 0;'>{score:.1f}</div>",
                             unsafe_allow_html=True)
                 with c3:
-                    if st.button("👁", key=f"view_{i}", help=f"View CT: {name}"):
+                    if st.button("View", key=f"view_{i}", help=f"View CT: {name}"):
                         st.session_state["viewing_slice"] = i
     
             vidx = st.session_state.get("viewing_slice")
