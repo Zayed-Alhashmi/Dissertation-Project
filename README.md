@@ -1,6 +1,6 @@
-# ProjectAnti — Automated CAC Scoring from Chest CT
+# Automated CAC Scoring from Chest CT
 
-**BSc Computer Science with Artificial Intelligence — University of Leeds, 2026**  
+**BSc Computer Science with Artificial Intelligence, University of Leeds, 2026**  
 **Author:** Zayed Khaled Omar Alhashmi
 
 ---
@@ -26,14 +26,14 @@ The system is validated against ground truth scores across **69 patients**, with
 pip install -r requirements.txt
 ```
 
-> Python 3.10+ recommended. A virtual environment is strongly advised.
+> Python 3.10+ is recommended.
 
 ---
 
 ## Project Structure
 
 ```
-ProjectAnti/
+Dissertation-Project/
 ├── classical/
 │   ├── __init__.py
 │   ├── load_ct.py          # DICOM loading and HU conversion
@@ -238,6 +238,8 @@ data/
 
 Patches are 64×64 pixels, normalised to [0, 1] via `np.clip(hu, 0, 1000) / 1000`.
 
+ResNet-18 achieves the best performance across all metrics, reducing MAE by 31% over the classical baseline and correctly categorising 43% of patients by clinical risk category.
+
 ---
 
 ## Key References
@@ -246,10 +248,10 @@ Patches are 64×64 pixels, normalised to [0, 1] via `np.clip(hu, 0, 1000) / 1000
 1. Agatston, A.S. et al. (1990). Quantification of coronary artery calcium using ultrafast CT. *JACC*, 15(4), 827–832.
 
 **Most directly comparable to this work - automated CAC from non-gated CT:**
-2. Lessmann, N. et al. (2017). Automatic calcium scoring in low-dose chest CT using deep neural networks with dilated convolutions. *IEEE TMI*, 37(12), 2695–2703.
+2. Lessmann, N. et al. (2018). Automatic calcium scoring in low-dose chest CT using deep neural networks with dilated convolutions. *IEEE TMI*, 37(12), 2695–2703.
 3. de Vos, B.D. et al. (2019). Direct automatic coronary calcium scoring in cardiac and chest CT. *IEEE TMI*, 38(9), 2127–2138.
 4. Wolterink, J.M. et al. (2016). Automatic coronary artery calcium scoring in cardiac CT angiography using paired convolutional neural networks. *Medical Image Analysis*, 34, 123–136.
-5. Išgum, I. et al. (2007). Multi-atlas-based segmentation with local decision fusion - application to cardiac and aorta segmentation in CT scans. *IEEE TMI*, 26(8), 1077–1087.
+5. Išgum, I. et al. (2009). Multi-atlas-based segmentation with local decision fusion - application to cardiac and aorta segmentation in CT scans. *IEEE TMI*, 26(8), 1077–1087.
 
 **CNN architectures used:**
 6. He, K. et al. (2016). Deep residual learning for image recognition. *CVPR*, 770–778.
@@ -266,4 +268,4 @@ Patches are 64×64 pixels, normalised to [0, 1] via `np.clip(hu, 0, 1000) / 1000
 
 ## License
 
-For academic use only. Patient data not included. Model weights not included.
+Patient data is subject to the PhysioNet Credentialed Health Data License 1.5.0 and is not included in this repository.
