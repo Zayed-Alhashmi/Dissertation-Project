@@ -409,6 +409,19 @@ st.markdown("""
 # Helper: card wrapper
 
 
+def card_open(border_color="#e2e8f0"):
+    st.markdown(
+        f"""<div style="background:white; border-radius:16px; padding:28px 32px;
+        box-shadow:0 4px 15px rgba(0,0,0,0.03); border-top:4px solid {border_color};
+        margin-bottom:24px;">""",
+        unsafe_allow_html=True,
+    )
+
+
+def card_close():
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def section_label(text):
     st.markdown(f"""<div style="font-size:11px; font-weight:700; color:#94a3b8;
     letter-spacing:0.1em; text-transform:uppercase; margin-bottom:14px;">{text}</div>""",
